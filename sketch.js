@@ -1,156 +1,110 @@
-let tick1;
-let tick2;
-let eminemImg; // image for points
+let myCanvas;
+let eminemImg;
 let y;
-let amplitudeControl, omegaControl, phiControl;
-let amplitudeControlLabel, omegaControlLabel, phiControlLabel;
+let amplitudeControl, omegaControl, phiControl, sizeControl;
 let ampMax;
+let t = 0;
+
+let capturer;
+let recording = false;
 
 function preload() {
-  eminemImg = loadImage("eminem.png"); // <-- make sure this file exists in same folder
+  eminemImg = loadImage("eminem.png"); // make sure this is in the same folder
 }
 
 function setup() {
-  let canvas = createCanvas(windowWidth, 0.9 * windowHeight);
-  canvas.parent('sketch-holder');
-  background(250);
+  myCanvas = createCanvas(windowWidth, 0.9 * windowHeight);
   frameRate(30);
-  textSize(18);
+
   let sliderWidth = min(300, width / 3);
 
-  // y array
   y = new Array(200);
   ampMax = min(200, height / 4);
 
-  // amplitude slider
+  // Amplitude slider
   amplitudeControl = createSlider(0, ampMax, ampMax / 2, 0);
-  amplitudeControl.position(30, height * 0.05);
-  amplitudeControl.parent('sketch-holder');
-  amplitudeControl.class("sim-slider");
-  amplitudeControl.input(sliderChange);
+  amplitudeControl.position(30, 30);
   amplitudeControl.size(sliderWidth, 0);
+  amplitudeControl.input(sliderChange);
 
-  amplitudeControlLabel = createP("Amplitude");
-  amplitudeControlLabel.position(30, amplitudeControl.y);
-  amplitudeControlLabel.parent('sketch-holder');
-
-  // omega slider
+  // Frequency slider
   omegaControl = createSlider(5, 30, 15, 0.1);
-  omegaControl.position(30, amplitudeControl.y + 70);
-  omegaControl.parent('sketch-holder');
-  omegaControl.class("sim-slider");
-  omegaControl.input(sliderChange);
+  omegaControl.position(30, 100);
   omegaControl.size(sliderWidth, 0);
+  omegaControl.input(sliderChange);
 
-  omegaControlLabel = createP();
-  omegaControlLabel.position(30, omegaControl.y);
-  omegaControlLabel.parent('sketch-holder');
-  katex.render('\\omega', omegaControlLabel.elt);
-
-  // phi slider
-  phiControl = createSlider(-2 * PI, +2 * PI, 0, PI * 0.1);
-  phiControl.position(30, omegaControl.y + 70);
-  phiControl.parent('sketch-holder');
-  phiControl.class("sim-slider");
-  phiControl.input(sliderChange);
+  // Phase slider
+  phiControl = createSlider(-2 * PI, 2 * PI, 0, PI * 0.1);
+  phiControl.position(30, 170);
   phiControl.size(sliderWidth, 0);
+  phiControl.input(sliderChange);
 
-  phiControlLabel = createP();
-  phiControlLabel.position(30, phiControl.y);
-  phiControlLabel.parent('sketch-holder');
-  katex.render('\\phi =' + phiControl.value().toFixed(2), phiControlLabel.elt);
+  // Dot size slider
+  sizeControl = createSlider(10, 80, 20, 1);
+  sizeControl.position(30, 240);
+  sizeControl.size(sliderWidth, 0);
+  sizeControl.input(sliderChange);
 
-  // equation label
-  let posEq = createP();
-  posEq.style('font-size', '20px');
-  posEq.position(width / 2, omegaControl.y + 40);
-  katex.render('x(t) = C \\cos \\left(\\omega t + \\phi \\right) ', posEq.elt);
+  noStroke();
 
-  tick1 = createP();
-  tick1.style('font-size', '20px');
-  katex.render('2 \\pi  ', tick1.elt);
-
-  tick2 = createP();
-  tick2.style('font-size', '20px');
-  katex.render('4 \\pi  ', tick2.elt);
-
-  let horizAxisLabel = createP();
-  horizAxisLabel.style('font-size', '20px');
-  horizAxisLabel.position(0.8 * width, 2 * height / 3 + 90);
-  katex.render('\\omega t ', horizAxisLabel.elt);
-
-  noLoop();
+  // Initialize CCapture for GIF
+  capturer = new CCapture({
+    format: 'gif',
+    framerate: 30,
+    verbose: true
+  });
 }
 
 function draw() {
   background(255);
   stroke(0);
 
-  // move to middle
   translate(80, 2 * height / 3);
-
-  // axes
   line(0, 0, width * 0.9, 0);
   line(0, -ampMax * 1.1, 0, ampMax * 1.1);
 
-  let widthScale = y.length / (width * 0.9);
   let amplitude = amplitudeControl.value();
   let omega = omegaControl.value();
   let phi = phiControl.value();
+  let dotSize = sizeControl.value();
 
-  // calculate points
   for (let x = 0; x < y.length; x++) {
-    y[x] = amplitude * Math.cos(0.01 * x * omega + phi);
+    y[x] = amplitude * Math.cos(0.01 * x * omega + phi + t);
   }
 
-  // draw images instead of points
   push();
   noStroke();
   for (let x = 0; x < y.length; x++) {
     let xscaled = map(x, 0, y.length, 0, width * 0.9);
-    image(eminemImg, xscaled - 10, -y[x] - 10, 20, 20);
+    image(eminemImg, xscaled - dotSize / 2, -y[x] - dotSize / 2, dotSize, dotSize);
   }
   pop();
 
-  // red curve line
-  push();
-  noFill();
-  stroke('red');
-  beginShape();
-  for (let x = 0; x < y.length; x++) {
-    let xscaled = map(x, 0, y.length, 0, width * 0.9);
-    curveVertex(xscaled, -y[x]);
+  t += 0.05;
+
+  // Capture frame if recording
+  if (recording) {
+    capturer.capture(myCanvas.elt);
   }
-  endShape();
-  pop();
-
-  showMaxAmplitude();
-  showXTicks();
 }
 
-function showMaxAmplitude() {
-  let amplitude = amplitudeControl.value();
-  stroke(0);
-  line(0, -amplitude, 10, -amplitude);
-  line(0, amplitude, 10, amplitude);
-  noStroke();
-  text('C', -40, -abs(amplitude) + 5);
-  text('-C ', -40, abs(amplitude) + 5);
-}
-
-function showXTicks() {
-  let omega = omegaControl.value();
-  let widthScale = y.length / (width * 0.9);
-  stroke(0);
-  translate(0, -80);
-  line(TWO_PI / (0.01 * omega * widthScale), 70, TWO_PI / (0.01 * omega * widthScale), 80);
-  line(2 * TWO_PI / (0.01 * omega * widthScale), 70, 2 * TWO_PI / (0.01 * omega * widthScale), 80);
-  noStroke();
-  tick1.position(TWO_PI / (0.01 * omega * widthScale) + 65, 2 * height / 3 + 90);
-  tick2.position(2 * TWO_PI / (0.01 * omega * widthScale) + 65, 2 * height / 3 + 90);
-}
-
+// Slider change
 function sliderChange() {
-  katex.render('\\phi =' + phiControl.value().toFixed(2), phiControlLabel.elt);
   redraw();
+}
+
+// Press R to start/stop GIF recording
+function keyPressed() {
+  if (key === 'r' || key === 'R') {
+    if (!recording) {
+      recording = true;
+      capturer.start();
+      console.log("Recording started...");
+    } else {
+      recording = false;
+      capturer.stop();
+      capturer.save();
+      console.log("Recording stopped and GIF saved!");
+    }
+  }
 }
